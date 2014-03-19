@@ -36,8 +36,9 @@ It needs 2 test public IP not used for other services to be able to test provide
       -l LOGLEVEL, --loglevel=LOGLEVEL
                             Loglevel (default: info)
 
-===Example config file===
-# vi /etc/check-providers.ini
+## Example config file
+
+> vi /etc/check-providers.ini
 
     [ADSL]
     device=eth0
