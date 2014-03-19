@@ -60,17 +60,17 @@ It needs 2 test public IP not used for other services to be able to test provide
 ## Ini file options
 
 One section for each provider, named the same as in the shorewall *providers* file
-Parameters      |  Value             | Descriptions
----------------------------------------------------
-target_ip       | 1.2.3.4            | IP to ping to test availability
-device          | eth?, ppp?         | local device on which provider is connected
-gateway         | 1.2.3.4            | next hop to test ARP ping
-max_rtt         | 2000               | max round trip time in ms to accept provider
-timeout         | 3                  | timout is sec for the ping
-ping_interval   | 0.4                | interval between ping 
-max_loss        | 30                 | max % of lost packets to accept provider
-ping_count      | 4                  | count of ping
-led             | 1,2,3              | on Alix router, power on/off led depending of availability 
-openvpn_master  | 0,1                | is provider used by openvpn (openvpn is restarted if vpn is running on provider)
-fallback        | 0,1                | is provider a fallback provider, in this case, it is never disabled.
-----------------------------------------------------
+|Parameters      |  Value             | Descriptions
+|----------------|--------------------|-------------
+|target_ip       | 1.2.3.4            | IP to ping to test availability
+|device          | eth?, ppp?         | local device on which provider is connected
+|gateway         | 1.2.3.4            | next hop to test ARP ping
+|max_rtt         | 2000               | max round trip time in ms to accept provider
+|timeout         | 3                  | timout is sec for the ping
+|ping_interval   | 0.4                | interval between ping 
+|max_loss        | 30                 | max % of lost packets to accept provider
+|ping_count      | 4                  | count of ping
+|led             | 1,2,3              | on Alix router, power on/off led depending of availability 
+|openvpn_master  | 0,1                | is provider used by openvpn (openvpn is restarted if vpn is running on provider)
+|fallback        | 0,1                | is provider a fallback provider, in this case, it is never disabled.
+|----------------|--------------------|--------------
