@@ -59,8 +59,9 @@ It needs 2 test public IP not used for other services to be able to test provide
     
 ## Ini file options
 
-One section for each provider, named the same as in the shorewall *providers* file
-|Parameters      |  Value             | Descriptions |
+One section for each provider, named the same as in the shorewall **shorewall.net/manpages/shorewall-providers.html** file
+
+|Parameters      |  Value             | Descriptions  |
 |----------------|--------------------|---------------|
 |target_ip       | 1.2.3.4            | IP to ping to test availability |
 |device          | eth?, ppp?         | local device on which provider is connected |
@@ -73,4 +74,4 @@ One section for each provider, named the same as in the shorewall *providers* fi
 |led             | 1,2,3              | on Alix router, power on/off led depending of availability | 
 |openvpn_master  | 0,1                | is provider used by openvpn (openvpn is restarted if vpn is running on provider)|
 |fallback        | 0,1                | is provider a fallback provider, in this case, it is never disabled. |
-|----------------|--------------------|--------------|
+
