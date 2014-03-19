@@ -95,3 +95,59 @@ One section for each provider, named the same as in the shorewall **http://shore
 |openvpn_master  | 0,1                | is provider used by openvpn (openvpn is restarted if vpn is running on provider)|
 |fallback        | 0,1                | is provider a fallback provider, in this case, it is never disabled. |
 
+Typical setup on debian wheezy
+==============================
+
+* install a shorewall in multi-provider mode
+* For provider in NAT mode (provider eth device has a non routable ip), don't declare a gateway, add rule to put led blinking and trigger providers availability 
+
+````vi /etc/network/interfaces````
+
+
+````
+# The primary network interface
+auto eth0
+iface eth0 inet static
+        address 192.168.1.11
+        netmask 255.255.255.0
+        up echo timer > /sys/class/leds/alix\:2/trigger
+        up /usr/bin/python /usr/local/bin/check_providers.py trigger
+        down echo 0 > /sys/class/leds/alix\:2/brightness
+        down /usr/bin/python /usr/local/bin/check_providers.py trigger
+````
+
+* for provider in pppoe mode
+
+````vi /etc/network/interfaces````
+
+
+````
+auto ppp0
+iface ppp0 inet ppp
+    provider dslprovider
+    # led blinks during session setup
+    up echo timer > /sys/class/leds/alix\:3/trigger
+    down echo 0 > /sys/class/leds/alix\:3/brightness
+````
+
+in /etc/ppp/ip-up.d/ppp-status :
+````
+DEVICE=$1
+MODEM=$2
+SPEED=$3
+IP=$4
+PPP_IP=$5
+
+# allume la led et active le provider GSM immediatement
+if [ $DEVICE = "ppp0" ]; then
+  led=3
+  /sbin/shorewall enable GSM
+  check_providers.py trigger
+  # power on / off leds on Alix
+  echo none > /sys/class/leds/alix\:$led/trigger
+ echo 1 > /sys/class/leds/alix\:$led/brightness
+fi
+
+exit 0
+
+````
