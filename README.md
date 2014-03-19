@@ -5,8 +5,28 @@ On a router with multiple providers and shorewall, monitor the providers and ena
 
 It needs 2 test public IP not used for other services to be able to test provider reachability when provider is disabled (so without routing table) in shorewall.
 
+Basically, it checks every <CHECK_INTERVAL> each provider sequentially. It sends pings and read rtt and loss. If loss or rtt is too high, the provider is declared unavailable.
 
-*check_providers.py --help*
+When all providers have been checked, if there is at least one available provider, it disables the unavailable ones to make sure no connection use them.
+
+Features
+--------
+* OpenVPN is restarted if it is found running on an unavailable provider, or if state of openvpn_master provider changed
+* Status Leds on Alix box can be up or down depending on status of provider
+* Check of providers can be triggered by running ''check_providers.py trigger'', interesting to put in ifup.d or ifdown.d, or ipup.d and ipdown.d handlers
+* removes default gw in main routing table that could be put by dhcp clients
+* adds static routes in main routing table for testing availibility without providers's own routing table
+
+Technical details
+-----------------
+* default configuration file in /etc/check-providers.ini
+* pid file in /var/run/check-providers.pid
+* log file in /var/log/check-providers.log
+* sending a -HUP signal to process triggers immediate provider check
+* periodic providers check (every 60s by default) 
+
+
+```check_providers.py --help```
     
     Usage: check_providers.py -c configfile action
     
@@ -38,7 +58,7 @@ It needs 2 test public IP not used for other services to be able to test provide
 
 ## Example config file
 
-> vi /etc/check-providers.ini
+```vi /etc/check-providers.ini```
 
     [ADSL]
     device=eth0
