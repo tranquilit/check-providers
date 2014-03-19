@@ -3,6 +3,8 @@ check-providers
 
 On a router with multiple providers and shorewall, monitor the providers and enable/disable them when one is failing.restart openvpn if running on the failing provider.
 
+It needs 2 test public IP not used for other services to be able to test provider reachability when provider is disabled (so without routing table) in shorewall.
+
 
 *check_providers.py --help*
     
@@ -33,3 +35,23 @@ On a router with multiple providers and shorewall, monitor the providers and ena
                             Path to log file (default: none)
       -l LOGLEVEL, --loglevel=LOGLEVEL
                             Loglevel (default: info)
+
+===Example config file===
+# vi /etc/check-providers.ini
+
+    [ADSL]
+    device=eth0
+    target_ip=185.16.67.23
+    gateway=192.168.1.1
+    led=2
+    openvpn_master=1
+    
+    [GSM]
+    device=ppp3g
+    target_ip=185.16.67.24
+    max_loss=40
+    max_rtt=2000
+    ping_count=20
+    timeout=3
+    led=3
+    fallback=1
