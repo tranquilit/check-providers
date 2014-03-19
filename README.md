@@ -151,3 +151,26 @@ fi
 exit 0
 
 ````
+
+same for down
+
+````
+#!/bin/sh
+DEVICE=$1
+MODEM=$2
+SPEED=$3
+IP=$4
+PPP_IP=$5
+
+# eteindre la led 3 pour gsm et la 2 pour le reste (arbitrairement...)
+if [ $DEVICE = "ppp0" ]; then
+  led=3
+  /sbin/shorewall disable GSM
+  # power on / off leds on Alix
+  echo none > /sys/class/leds/alix\:$led/trigger
+  echo 0 > /sys/class/leds/alix\:$led/brightness
+fi
+
+
+exit 0
+
