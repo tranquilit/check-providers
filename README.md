@@ -59,7 +59,7 @@ It needs 2 test public IP not used for other services to be able to test provide
     
 ## Ini file options
 
-One section for each provider, named the same as in the shorewall **shorewall.net/manpages/shorewall-providers.html** file
+One section for each provider, named the same as in the shorewall **http://shorewall.net/manpages/shorewall-providers.html** file
 
 |Parameters      |  Value             | Descriptions  |
 |----------------|--------------------|---------------|
