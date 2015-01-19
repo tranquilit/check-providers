@@ -94,6 +94,8 @@ One section for each provider, named the same as in the shorewall **http://shore
 |led             | 1,2,3              | on Alix router, power on/off led depending of availability | 
 |openvpn_master  | 0,1                | is provider used by openvpn (openvpn is restarted if vpn is running on provider)|
 |fallback        | 0,1                | is provider a fallback provider, in this case, it is never disabled. |
+|source_ip       | 1.2.3.4            | optional source_ip fo rthe provider in cas the providers are sharing the same physical interface |
+
 
 Typical setup on debian wheezy
 ==============================

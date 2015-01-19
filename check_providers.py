@@ -1,3 +1,4 @@
+
 #! /usr/bin/python
 # -*- coding: UTF-8 -*-
 #-------------------------------------------------------------------------------
@@ -144,6 +145,7 @@ class Provider(object):
     self.device_type=None
     self.device_mac=None
     self.last_ip=None
+    self.source_ip=None
 
     self._gateway=gateway
 
@@ -185,7 +187,7 @@ conntrack v1.2.1 (conntrack-tools): 1 flow entries have been shown.
 
 
   def read_config(self,config_file):
-    for attrib in ['target_ip','device','gateway']:
+    for attrib in ['target_ip','device','gateway','source_ip']:
       if config_file.has_option(self.provider_name,attrib):
         if attrib == 'gateway':
           setattr(self,'_gateway',config_file.get(self.provider_name,attrib))
@@ -306,7 +308,9 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
     IPV4ADDR = re.compile(r'\sinet\s+(?P<ipv4>\d+.\d+.\d+.\d+)[/\s]')
     MACADDR = re.compile(r'link/(?P<type>\S+)(\s(?P<mac>\S+))?')
     ipaddr = IPV4ADDR.search(output)
-    if ipaddr:
+    if self.source_ip:
+      self.last_ip = self.source_ip
+    elif ipaddr:
       self.last_ip = ipaddr.groupdict()['ipv4']
     else:
       self.last_ip = None
@@ -476,6 +480,7 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
       status = self.status,
       last_check_time = self.last_check_time,
       last_ip = self.last_ip,
+      source_ip = self.source_ip,
       device_mac = self.device_mac,
       device_type = self.device_type,
       gateway_alive = self.gateway_alive,
