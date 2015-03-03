@@ -1,4 +1,3 @@
-
 #! /usr/bin/python
 # -*- coding: UTF-8 -*-
 #-------------------------------------------------------------------------------
@@ -636,6 +635,8 @@ if __name__ == '__main__':
           try:
             logger.info('Checking providers {}:'.format(','.join([provider.provider_name for provider in providers])))
             current_ok = [ provider for provider in providers if provider.check_available() ]
+            # list of providers which are used by openvpn
+            openvpn_prov = [ provider for provider in providers if provider.used_by_openvpn() ]
             for provider in providers:
               if provider._available:
                 if not provider.enabled:
@@ -670,6 +671,8 @@ if __name__ == '__main__':
       print "Checking {}".format(provider.provider_name)
       provider.check_available()
       print provider
+      if provider.used_by_openvpn():
+         print "This provider is used by Openvpn"
   elif action == 'check-json':
     result = []
     if len(args) >= 2:
