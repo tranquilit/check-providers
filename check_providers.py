@@ -408,6 +408,8 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
       print run('/sbin/shorewall enable {}'.format(self.provider_name),dry_run=self.dry_run)
       if self.openvpn_master:
         logger.info('Restarting openvpn')
+        print run('/usr/sbin/conntrack -F',dry_run=self.dry_run)
+        print run('ip route flush cache',dry_run=self.dry_run)
         print run('/etc/init.d/openvpn restart',dry_run=self.dry_run)
       # here check the connectivity.... else rollback
       self.update_leds()
@@ -422,7 +424,9 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
       # remove connections
       if self.last_ip:
         logger.info('removing conntrack entries')
-        logger.debug(run('/usr/sbin/conntrack -D -s {src}'.format(src=self.last_ip))[1],dry_run=self.dry_run)
+        print run('/sbin/ip route flush cache',dry_run=self.dry_run)
+        #print run('/usr/sbin/conntrack -D -s {src}'.format(src=self.last_ip),dry_run=self.dry_run)
+        print run('/usr/sbin/conntrack -F',dry_run=self.dry_run)
       # be sure there is no default gw in main table so that fallback provider can be reached
       self.remove_default_gw()
       # restart openvpn if it was running on this provider
