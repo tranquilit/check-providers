@@ -177,11 +177,14 @@ class Provider(object):
   def used_by_openvpn(self,proto='udp',port=1194):
     (retcode,output) = run('conntrack -L -p {proto} --dport {port} -o extended | grep "={src}"'.format(proto=proto,src=self.last_ip,port=port))
     """
-ipv4 2 udp 17 178 src=192.168.149.184 dst=80.13.55.10 sport=1194 dport=1194 src=80.13.55.10 dst=192.168.149.184 sport=1194 dport=1194 [ASSURED] mark=1 use=1
 conntrack v1.2.1 (conntrack-tools): 1 flow entries have been shown.
+ipv4 2 udp 17 178 src=192.168.149.184 dst=80.13.55.10 sport=1194 dport=1194 src=80.13.55.10 dst=192.168.149.184 sport=1194 dport=1194 [ASSURED] mark=1 use=1
 """
-    conn = output.splitlines()[:-1]
-    return conn
+    conn = output.splitlines()
+    for c in conn:
+        if "={src} ".format(src=self.last_ip) in c:
+            return True
+    return False
 
 
   def read_config(self,config_file):
@@ -402,7 +405,12 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
   def enable(self):
     if not self.enabled:
       logger.debug('Enable {}'.format(self.provider_name))
-      print run('/sbin/shorewall enable {}'.format(self.provider_name),dry_run=self.dry_run)
+      try:
+          print run('/sbin/shorewall enable {}'.format(self.provider_name),dry_run=self.dry_run)
+      except Exception as e:
+          logger.info('Retrying to disable/enable provider because %s'% e)
+          print run('/sbin/shorewall disable {}'.format(self.provider_name),dry_run=self.dry_run)
+          print run('/sbin/shorewall enable {}'.format(self.provider_name),dry_run=self.dry_run)
       if self.openvpn_master:
         logger.info('Restarting openvpn')
         print run('/etc/init.d/openvpn stop',dry_run=self.dry_run)
@@ -642,11 +650,33 @@ if __name__ == '__main__':
             current_ok = [ provider for provider in providers if provider.check_available() ]
             # list of providers which are used by openvpn
             openvpn_prov = [ provider for provider in providers if provider.used_by_openvpn() ]
+            shorewall_restart_needed = False
             for provider in providers:
+              # we will check if a workable provider needs to be enabled by shorewall
               if provider._available:
                 if not provider.enabled:
                   logger.warning("Enabling the available provider {}".format(provider.provider_name))
                   provider.enable()
+                # todo : check balance routing table. If an interface involved in default route is removed (ppp or tun)
+                #    the entire default route entry is removed by the kernel.
+                # so if we can't find a route which refer to it in balance table, trigger a restart of shorewall to cleanup the situation...
+                if not shorewall_restart_needed and not provider.fallback:
+                    (retcode,output) = run('ip route show table balance')
+                    """
+                    default
+                        nexthop via 185.16.51.9  realm 3 dev eth1 weight 1
+                        nexthop dev tun2 weight 1
+                    """
+                    balance = output.splitlines()
+                    in_balance = False
+                    for l in balance:
+                        if provider.gateway in l.split(' ') or provider.device in l.split(' '):
+                            in_balance= True
+                            break
+                    if not in_balance:
+                        shorewall_restart_needed = True
+                        logger.critical("Shorewall restart needed because provider {} is not in default balance route ".format(provider.provider_name))
+                 
               else:
                 if provider.enabled:
                   if current_ok and not provider.fallback:
@@ -658,6 +688,9 @@ if __name__ == '__main__':
                     else:
                       logger.critical("Not disabling fallback provider {}".format(provider.provider_name))
               logger.info(' {}'.format(provider))
+
+            
+
             signal.alarm(options.check_interval)
             signal.pause()
             #time.sleep(options.check_interval)
