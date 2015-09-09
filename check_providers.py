@@ -144,7 +144,6 @@ class Provider(object):
     self.device_type=None
     self.device_mac=None
     self.last_ip=None
-    self.source_ip=None
 
     self._gateway=gateway
 
@@ -186,7 +185,7 @@ conntrack v1.2.1 (conntrack-tools): 1 flow entries have been shown.
 
 
   def read_config(self,config_file):
-    for attrib in ['target_ip','device','gateway','source_ip']:
+    for attrib in ['target_ip','device','gateway']:
       if config_file.has_option(self.provider_name,attrib):
         if attrib == 'gateway':
           setattr(self,'_gateway',config_file.get(self.provider_name,attrib))
@@ -307,9 +306,7 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
     IPV4ADDR = re.compile(r'\sinet\s+(?P<ipv4>\d+.\d+.\d+.\d+)[/\s]')
     MACADDR = re.compile(r'link/(?P<type>\S+)(\s(?P<mac>\S+))?')
     ipaddr = IPV4ADDR.search(output)
-    if self.source_ip:
-      self.last_ip = self.source_ip
-    elif ipaddr:
+    if ipaddr:
       self.last_ip = ipaddr.groupdict()['ipv4']
     else:
       self.last_ip = None
@@ -408,11 +405,12 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
       print run('/sbin/shorewall enable {}'.format(self.provider_name),dry_run=self.dry_run)
       if self.openvpn_master:
         logger.info('Restarting openvpn')
-        print run('/usr/sbin/conntrack -F',dry_run=self.dry_run)
+        print run('/etc/init.d/openvpn stop',dry_run=self.dry_run)
         print run('ip route flush cache',dry_run=self.dry_run)
-        print run('/etc/init.d/openvpn restart',dry_run=self.dry_run)
+        print run('/etc/init.d/openvpn start',dry_run=self.dry_run)
       # here check the connectivity.... else rollback
       self.update_leds()
+      print('Routes after enabling provider %s\n%s'%(self.provider_name,run('/sbin/shorewall show routing')))
     else:
       logger.debug('{} already enabled'.format(self.device))
 
@@ -420,20 +418,24 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
     if self.enabled:
       openvpn = self.used_by_openvpn()
       logger.debug('Disable {}'.format(self.provider_name))
+      # restart openvpn if it was running on this provider
+      if openvpn:
+        logger.info('openvpn was running here, stopping openvpn')
+        print run('/etc/init.d/openvpn stop',dry_run=self.dry_run)
       print run('/sbin/shorewall disable {}'.format(self.provider_name),dry_run=self.dry_run)
       # remove connections
       if self.last_ip:
         logger.info('removing conntrack entries')
-        print run('/sbin/ip route flush cache',dry_run=self.dry_run)
-        #print run('/usr/sbin/conntrack -D -s {src}'.format(src=self.last_ip),dry_run=self.dry_run)
-        print run('/usr/sbin/conntrack -F',dry_run=self.dry_run)
+        logger.info(run('/usr/sbin/conntrack -D -s {src}'.format(src=self.last_ip))[1],dry_run=self.dry_run)
+        logger.info(run('/usr/sbin/conntrack -D -q {src}'.format(src=self.last_ip))[1],dry_run=self.dry_run)
       # be sure there is no default gw in main table so that fallback provider can be reached
       self.remove_default_gw()
       # restart openvpn if it was running on this provider
       if openvpn:
         logger.info('openvpn was running here, restarting openvpn')
-        print run('/etc/init.d/openvpn restart',dry_run=self.dry_run)
+        print run('/etc/init.d/openvpn start',dry_run=self.dry_run)
       self.update_leds()
+      print('Routes after provider %s disabling\n%s'%(self.provider_name,run('/sbin/shorewall show routing')))
 
   def remove_default_gw(self):
     """Remove default route which could have been added in main routing table and will prevent fallback interface from taking over"""
@@ -483,7 +485,6 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
       status = self.status,
       last_check_time = self.last_check_time,
       last_ip = self.last_ip,
-      source_ip = self.source_ip,
       device_mac = self.device_mac,
       device_type = self.device_type,
       gateway_alive = self.gateway_alive,
