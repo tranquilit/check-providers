@@ -186,6 +186,28 @@ ipv4 2 udp 17 178 src=192.168.149.184 dst=80.13.55.10 sport=1194 dport=1194 src=
             return True
     return False
 
+  def openvpn_local_sockets(self):
+    """
+    Returns:
+        list of str of IP where openvpn is bound.
+    """
+    (retcode,output) = run("/bin/netstat -lupnw | grep -E '(udp|tcp) .*/openvpn'")
+    """
+    udp        0      0 192.168.1.254:1194      0.0.0.0:*                           16919/openvpn
+    """
+    result = []
+    listening = output.splitlines()
+    for conn in listening:
+        args = conn.split()
+        proto = args[0]
+        (local_ip,local_port) = args[3].rsplit(':',1)
+        result.append((proto,local_ip,local_port))
+
+  def delete_openvpn_conntrack(self):
+    """Remove conntrack entries matching the OpenVPN listening processes"""
+    for (proto,ip,port) in self.openvpn_local_sockets():
+        if ip != '0.0.0.0':
+            run('/usr/sbin/conntrack -D -p {proto} -s {src} --sport={port}'.format(src=ip,proto=proto,port=port),dry_run=self.dry_run)
 
   def read_config(self,config_file):
     for attrib in ['target_ip','device','gateway']:
@@ -406,16 +428,16 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
     if not self.enabled:
       logger.debug('Enable {}'.format(self.provider_name))
       try:
-          print run('/sbin/shorewall enable {}'.format(self.provider_name),dry_run=self.dry_run)
+          print(run('/var/lib/shorewall/firewall enable {}'.format(self.provider_name),dry_run=self.dry_run))
       except Exception as e:
           logger.info('Retrying to disable/enable provider because %s'% e)
-          print run('/sbin/shorewall disable {}'.format(self.provider_name),dry_run=self.dry_run)
-          print run('/sbin/shorewall enable {}'.format(self.provider_name),dry_run=self.dry_run)
+          print(run('/var/lib/shorewall/firewall restart',dry_run=self.dry_run))
       if self.openvpn_master:
         logger.info('Restarting openvpn')
-        print run('/etc/init.d/openvpn stop',dry_run=self.dry_run)
-        print run('ip route flush cache',dry_run=self.dry_run)
-        print run('/etc/init.d/openvpn start',dry_run=self.dry_run)
+        print(run('/etc/init.d/openvpn stop',dry_run=self.dry_run))
+        print(run('ip route flush cache',dry_run=self.dry_run))
+        self.delete_openvpn_conntrack()
+        print(run('/etc/init.d/openvpn start',dry_run=self.dry_run))
       # here check the connectivity.... else rollback
       self.update_leds()
       print('Routes after enabling provider %s\n%s'%(self.provider_name,run('/sbin/shorewall show routing')))
@@ -429,19 +451,19 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
       # restart openvpn if it was running on this provider
       if openvpn:
         logger.info('openvpn was running here, stopping openvpn')
-        print run('/etc/init.d/openvpn stop',dry_run=self.dry_run)
-      print run('/sbin/shorewall disable {}'.format(self.provider_name),dry_run=self.dry_run)
+        print(run('/etc/init.d/openvpn stop',dry_run=self.dry_run))
+      print(run('/var/lib/shorewall/firewall disable {}'.format(self.provider_name),dry_run=self.dry_run))
       # remove connections
       if self.last_ip:
         logger.info('removing conntrack entries')
-        logger.info(run('/usr/sbin/conntrack -D -s {src}'.format(src=self.last_ip))[1],dry_run=self.dry_run)
-        logger.info(run('/usr/sbin/conntrack -D -q {src}'.format(src=self.last_ip))[1],dry_run=self.dry_run)
+        logger.info(run('/usr/sbin/conntrack -D -s {src}'.format(src=self.last_ip),dry_run=self.dry_run)[1])
+        logger.info(run('/usr/sbin/conntrack -D -q {src}'.format(src=self.last_ip),dry_run=self.dry_run)[1])
       # be sure there is no default gw in main table so that fallback provider can be reached
       self.remove_default_gw()
       # restart openvpn if it was running on this provider
       if openvpn:
         logger.info('openvpn was running here, restarting openvpn')
-        print run('/etc/init.d/openvpn start',dry_run=self.dry_run)
+        print(run('/etc/init.d/openvpn start',dry_run=self.dry_run))
       self.update_leds()
       print('Routes after provider %s disabling\n%s'%(self.provider_name,run('/sbin/shorewall show routing')))
 
@@ -450,7 +472,7 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
     (retcode,routes) = run('ip route list table main dev {}'.format(self.device))
     if retcode == 0:
       if 'default ' in routes:
-        print run('ip route del default table main dev {}'.format(self.device),dry_run=self.dry_run)
+        print(run('ip route del default table main dev {}'.format(self.device),dry_run=self.dry_run))
 
   def __str__(self):
     def get_available(en):
@@ -506,7 +528,7 @@ def read_config(filename,providers):
   cp.read(filename)
 
   while providers:
-    provider.pop()
+    providers.pop()
 
   for provider_name in cp.sections():
     provider = Provider(provider_name)
@@ -676,7 +698,7 @@ if __name__ == '__main__':
                     if not in_balance:
                         shorewall_restart_needed = True
                         logger.critical("Shorewall restart needed because provider {} is not in default balance route ".format(provider.provider_name))
-                 
+
               else:
                 if provider.enabled:
                   if current_ok and not provider.fallback:
@@ -684,12 +706,12 @@ if __name__ == '__main__':
                     provider.disable()
                   else:
                     if not current_ok:
-                      logger.critical("About to disable provider {} but will not because there are no other one".format(provider.provider_name,provider.status))
+                      logger.critical("About to disable provider {} but will not because there are no other one".format(provider.provider_name))
                     else:
                       logger.critical("Not disabling fallback provider {}".format(provider.provider_name))
               logger.info(' {}'.format(provider))
 
-            
+
 
             signal.alarm(options.check_interval)
             signal.pause()
