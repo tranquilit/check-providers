@@ -134,6 +134,40 @@ Sent 2 probes (1 broadcast(s))
     result['alive'] = False
   return result
 
+def openvpn_local_sockets():
+    """
+    Returns:
+        list of str of IP where openvpn is bound.
+    """
+    (retcode,output) = run("/bin/netstat -lupnw | grep -E '(udp|tcp) .*/openvpn'")
+    """
+    udp        0      0 192.168.1.254:1194      0.0.0.0:*                           16919/openvpn
+    """
+    result = []
+    listening = output.splitlines()
+    for conn in listening:
+        args = conn.split()
+        proto = args[0]
+        (local_ip,local_port) = args[3].rsplit(':',1)
+        result.append((proto,local_ip,local_port))
+    return result
+
+def delete_conntrack(conn):
+    """Remove conntrack entries matching the OpenVPN listening processes"""
+    for (proto,ip,port) in conn:
+        if ip != '0.0.0.0':
+            run('/usr/sbin/conntrack -D -p {proto} -s {src} --sport={port}'.format(src=ip,proto=proto,port=port))
+        else:
+            run('/usr/sbin/conntrack -D -p {proto} --sport={port}'.format(src=ip,proto=proto,port=port))
+
+def restart_openvpn():
+    conn = openvpn_local_sockets()
+    print(run('/etc/init.d/openvpn stop'))
+    print(run('ip route flush cache'))
+    delete_conntrack(conn)
+    print(run('/etc/init.d/openvpn start'))
+
+
 class Provider(object):
   def __init__(self,provider_name,device=None,gateway=None,target_ip=None,max_rtt=2000.0,max_loss=30,ping_count=10,ping_interval=0.5,timeout=1.5,led=None):
     """Parameters of an Internet provider as defined in Shorewall and availability limits
@@ -185,30 +219,6 @@ ipv4 2 udp 17 178 src=192.168.149.184 dst=80.13.55.10 sport=1194 dport=1194 src=
         if "={src} ".format(src=self.last_ip) in c:
             return True
     return False
-
-  def openvpn_local_sockets(self):
-    """
-    Returns:
-        list of str of IP where openvpn is bound.
-    """
-    (retcode,output) = run("/bin/netstat -lupnw | grep -E '(udp|tcp) .*/openvpn'")
-    """
-    udp        0      0 192.168.1.254:1194      0.0.0.0:*                           16919/openvpn
-    """
-    result = []
-    listening = output.splitlines()
-    for conn in listening:
-        args = conn.split()
-        proto = args[0]
-        (local_ip,local_port) = args[3].rsplit(':',1)
-        result.append((proto,local_ip,local_port))
-    return result
-
-  def delete_openvpn_conntrack(self,conn):
-    """Remove conntrack entries matching the OpenVPN listening processes"""
-    for (proto,ip,port) in conn:
-        if ip != '0.0.0.0':
-            run('/usr/sbin/conntrack -D -p {proto} -s {src} --sport={port}'.format(src=ip,proto=proto,port=port),dry_run=self.dry_run)
 
   def read_config(self,config_file):
     for attrib in ['target_ip','device','gateway']:
@@ -433,14 +443,6 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
       except Exception as e:
           logger.info('Retrying to disable/enable provider because %s'% e)
           print(run('/var/lib/shorewall/firewall restart',dry_run=self.dry_run))
-      if self.openvpn_master:
-        logger.info('Restarting openvpn')
-        conn = self.openvpn_local_sockets()
-        print(run('/etc/init.d/openvpn stop',dry_run=self.dry_run))
-        print(run('ip route flush cache',dry_run=self.dry_run))
-        print(conn)
-        self.delete_openvpn_conntrack(conn)
-        print(run('/etc/init.d/openvpn start',dry_run=self.dry_run))
       # here check the connectivity.... else rollback
       self.update_leds()
       print('Routes after enabling provider %s\n%s'%(self.provider_name,run('/sbin/shorewall show routing')))
@@ -682,6 +684,10 @@ if __name__ == '__main__':
                 if not provider.enabled:
                   logger.warning("Enabling the available provider {}".format(provider.provider_name))
                   provider.enable()
+                  if provider.openvpn_master:
+                    restart_openvpn()
+
+
                 # todo : check balance routing table. If an interface involved in default route is removed (ppp or tun)
                 #    the entire default route entry is removed by the kernel.
                 # so if we can't find a route which refer to it in balance table, trigger a restart of shorewall to cleanup the situation...
@@ -701,6 +707,7 @@ if __name__ == '__main__':
                     if not in_balance:
                         shorewall_restart_needed = True
                         logger.critical("Shorewall restart needed because provider {} is not in default balance route ".format(provider.provider_name))
+
 
               else:
                 if provider.enabled:
