@@ -202,10 +202,11 @@ ipv4 2 udp 17 178 src=192.168.149.184 dst=80.13.55.10 sport=1194 dport=1194 src=
         proto = args[0]
         (local_ip,local_port) = args[3].rsplit(':',1)
         result.append((proto,local_ip,local_port))
+    return result
 
-  def delete_openvpn_conntrack(self):
+  def delete_openvpn_conntrack(self,conn):
     """Remove conntrack entries matching the OpenVPN listening processes"""
-    for (proto,ip,port) in self.openvpn_local_sockets():
+    for (proto,ip,port) in conn:
         if ip != '0.0.0.0':
             run('/usr/sbin/conntrack -D -p {proto} -s {src} --sport={port}'.format(src=ip,proto=proto,port=port),dry_run=self.dry_run)
 
@@ -434,9 +435,11 @@ available == True if actual rtt and loss are below the max_rtt and max_loss
           print(run('/var/lib/shorewall/firewall restart',dry_run=self.dry_run))
       if self.openvpn_master:
         logger.info('Restarting openvpn')
+        conn = self.openvpn_local_sockets()
         print(run('/etc/init.d/openvpn stop',dry_run=self.dry_run))
         print(run('ip route flush cache',dry_run=self.dry_run))
-        self.delete_openvpn_conntrack()
+        print(conn)
+        self.delete_openvpn_conntrack(conn)
         print(run('/etc/init.d/openvpn start',dry_run=self.dry_run))
       # here check the connectivity.... else rollback
       self.update_leds()
