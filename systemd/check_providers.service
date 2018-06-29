@@ -6,7 +6,7 @@ After=shorewall.service
 [Service]
 Type=simple
 StandardOutput=syslog
-ExecStart=/usr/bin/python /opt/check_providers/check_providers.py monitor -i 20
+ExecStart=/usr/bin/python /opt/check_providers/check_providers.py monitor
 Restart=on-abort
 
 [Install]
